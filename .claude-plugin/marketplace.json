@@ -1,0 +1,5 @@
+{
+  "name": "draw-mod",
+  "owner": { "name": "Hypnodroid" },
+  "plugins": [{ "name": "draw", "source": "./" }]
+}
