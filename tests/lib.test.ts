@@ -131,6 +131,19 @@ describe('Sends', () => {
     expect(parseSend(JSON.stringify({ sent: 'send-4', mine: true }))).toEqual({ sent: 'send-4', mine: true })
   })
 
+  test('a Send keeps its scope', () => {
+    expect(parseSend(JSON.stringify({ sent: 'send-8', scope: 'chat' }))).toEqual({ sent: 'send-8', scope: 'chat' })
+  })
+
+  test('a chat Send says to answer with say', () => {
+    const note = 'chat on frame frame-id-cozy-lighthouse from a***@example.com:\npack the socks?'
+    expect(sendText({ sent: 'send-9', scope: 'chat', note }, { key: 'main', status: 'listening' })).toContain('answer it with the draw say tool')
+  })
+
+  test('a chat Send drops the answer-on-the-board line', () => {
+    expect(sendText({ sent: 'send-10', scope: 'chat', note: 'hi' }, { key: 'main', status: 'listening' })).not.toContain('then answer on the board')
+  })
+
   test('a Send with no note says so', () => {
     expect(sendText({ sent: 'send-5' }, { key: 'main', status: 'listening' })).toContain('(sent with no note)')
   })
