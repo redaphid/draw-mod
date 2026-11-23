@@ -19,5 +19,3 @@ claude plugin install draw --marketplace redaphid/draw-mod
 ```
 
 In the desktop app: click + next to the prompt box, then Plugins, Add marketplace with `redaphid/draw-mod`, then Add plugin.
-
-The repository is private. It installs only for people who can read it on GitHub and whose machine already has a git credential for github.com (an SSH key, or `gh auth login` then `gh auth setup-git`).
