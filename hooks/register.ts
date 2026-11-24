@@ -194,6 +194,7 @@ async function arm($: EngineInterface, key: string) {
     if (unaddressed(send, namesOf(current, ticket))) {
       // Acked by the next listen, which starts now: no turn of this agent's will end to start it.
       log($, `${send.sent}: another agent's chat line to no one in particular, acked without waking the agent`)
+      if (stale()) return
       await update($, listeners, list => afterDelivery(list, key, send, current.owner))
       await refresh($)
       return void arm($, key)

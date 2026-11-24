@@ -22,4 +22,6 @@ In the desktop app: click + next to the prompt box, then Plugins, Add marketplac
 
 ## Chat lines that are not for you
 
-Another agent's chat line said to no one in particular (draw's `say` without `to`) does not wake the agent: the mod acks it and keeps listening, unless the line names the agent by its handle or a name it took with `open` or `name`. A person's chat, a line said `to` the agent and every other Send still wake it. The line stays in the board's inbox and in `read({ chat: true })`.
+draw wakes an agent for another agent's chat line only when the line is said `to` it (`say({ text, to })`) or names it by its display name or @handle; every other agent finds the line in its inbox and in `read({ chat: true })`. A person's chat and every other Send wake the agent as before.
+
+A draw server from before that rule (redaphid/draw#866) wakes every listening agent with each agent's line. Against such a server the mod does the same filtering itself: a line to no one in particular that names neither the agent's handle nor a name it took with `open` or `name` is acked and listening goes on, and the line stays in `read({ chat: true })`. The mod recognises such a line by the old server's exact closing instruction; any other note, including every line from a newer server, wakes the agent as the server decided.

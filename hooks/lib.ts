@@ -310,15 +310,20 @@ export const mentions = (text: string, names: readonly string[]) =>
     return literal !== '' && new RegExp(`(?<![\\p{L}\\p{N}-])@?${literal}(?![\\p{L}\\p{N}-])`, 'iu').test(text)
   })
 
-// The board wraps an agent's chat line as a header, the line, a blank line and this instruction.
+// A board from before 2026-11-24 wraps an agent's chat line as a header, the line, a blank line and an instruction
+// that starts and ends with these. A board from after it words that instruction differently, since it already wakes
+// only the agents a line names (redaphid/draw#866), and its names (a display name the agent took in an earlier session)
+// can be more than the mod knows, so the mod leaves its lines alone rather than drop one the board meant to wake.
 const AGENT_CHAT = 'An agent said this.'
+const WAKES_EVERYONE = 'your answer wakes it.'
 
-// Another agent's chat line said to everyone and naming none of `names`: a status line, not a question for this agent.
-// The board wakes every listening agent with one (draw before the fix of 2026-11-24 did), and each wake costs a whole
-// model turn to read and dismiss, so the mod acks it without waking anyone. It stays in the inbox and the frame's chat.
+// Another agent's chat line said to everyone and naming none of `names`, from a board that wakes every listening agent
+// with one: a status line, not a question for this agent. Each wake costs a whole model turn to read and dismiss, so
+// the mod acks it without waking anyone. It stays in the frame's chat. Any note the mod does not recognise wakes.
 export function unaddressed(send: Send, names: readonly string[]) {
   if (send.scope !== 'chat' || send.to) return false
   const lines = (send.note ?? '').trimEnd().split('\n')
-  if (!lines.at(-1)?.startsWith(AGENT_CHAT)) return false
+  const last = lines.at(-1) ?? ''
+  if (!last.startsWith(AGENT_CHAT) || !last.endsWith(WAKES_EVERYONE)) return false
   return !mentions(lines.slice(1, -2).join('\n'), names)
 }

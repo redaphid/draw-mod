@@ -740,4 +740,14 @@ describe('chat lines that are not for this agent', () => {
     await clock.settle()
     expect(state.prompts.join()).toContain('send-45')
   })
+
+  // A newer board wakes only the agents a line names, by names the mod may not know (one taken in an earlier session).
+  test("a line a newer board woke this agent for wakes it, though the mod does not know the name it uses", async ($, on) => {
+    const { clock, state } = world(on)
+    await listenMain($, clock)
+    const note = `chat on frame talk "talk" from Stopwatch Heron:\nQuiet Bell, is the bench done?\n\nAn agent said this. Answer with say({ text, frame: "talk", to: "Stopwatch Heron" }) only if it asks you something; that wakes it alone.`
+    state.listens[0]?.end(chat('send-46', note), 0)
+    await clock.settle()
+    expect(state.prompts.join()).toContain('send-46')
+  })
 })

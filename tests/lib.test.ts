@@ -312,4 +312,15 @@ describe('unaddressed chat', () => {
   test('a selection Send is never unaddressed', () => {
     expect(unaddressed({ sent: 'send-6', note: line('anything') }, [])).toBe(false)
   })
+
+  // A board that already wakes only the agents a line names may know a name the mod does not, so the mod never drops its lines.
+  test("a line from a board that wakes only the agents it names is left to that board", () => {
+    const note = `chat on frame talk "talk" from Stopwatch Heron:\nQuiet Bell, look at this\n\nAn agent said this. Answer with say({ text, frame: "talk", to: "Stopwatch Heron" }) only if it asks you something; that wakes it alone.`
+    expect(unaddressed({ sent: 'send-8', scope: 'chat', note }, [])).toBe(false)
+  })
+
+  test('a chat note in any wording the mod does not know wakes the agent', () => {
+    const note = `chat on frame talk from Stopwatch Heron:\nstatus\n\nAn agent said this. Reply with say if it asks you something.`
+    expect(unaddressed({ sent: 'send-9', scope: 'chat', note }, [])).toBe(false)
+  })
 })
