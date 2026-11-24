@@ -677,3 +677,67 @@ describe('register', () => {
     expect(state.listenerCalls.at(-1)?.lane).toBe(handle('the-lair', 'kite', 2))
   })
 })
+
+// The board wraps another agent's chat line in this note; `to` is set only when it was said to one agent.
+const agentLine = (text: string) =>
+  `chat on frame talk "talk" from Stopwatch Heron:\n${text}\n\nAn agent said this. Answer with say({ text, frame: "talk" }) only if it asks you something; your answer wakes it.`
+const chat = (sent: string, note: string, to: string | null = null, by = 'human:hypnodroid@…/stopwatch') =>
+  `${JSON.stringify({ sent, board: 'the-lair', by, to, note, scope: 'chat', mine: true })}\n`
+
+describe('chat lines that are not for this agent', () => {
+  const listenMain = async ($: Engine, clock: { settle: () => Promise<void> }, name?: string) => {
+    await $.session.start({ cwd: '/', surface: null, isInteractive: true })
+    await $.tool.call({ tool: 'mcp__claude_ai_draw__open', boardName: 'the-lair', ...(name ? { name } : {}) })
+    await $.turn.complete(turnEnd())
+    await clock.settle()
+  }
+
+  test("another agent's line to no one is acked by the next listen and wakes no one", async ($, on) => {
+    const { clock, state } = world(on)
+    await listenMain($, clock)
+    state.listens[0]?.end(chat('send-40', agentLine('Verified: first frame 23% faster (1.74 s to 1.34 s)')), 0)
+    await clock.settle()
+    expect({ prompts: state.prompts, next: state.listens[1]?.argv.slice(-2) }).toEqual({ prompts: [], next: ['--ack', 'send-40'] })
+  })
+
+  test("a person's chat message wakes the agent", async ($, on) => {
+    const { clock, state } = world(on)
+    await listenMain($, clock)
+    const note = 'chat on frame talk from human:hypnodroid@…:\nwhy blue?\n\nAnswer in the chat with say({ text, frame: "talk" }); keep it short, it may be read aloud.'
+    state.listens[0]?.end(chat('send-41', note, 'claude-code-1', 'human:hypnodroid@…'), 0)
+    await clock.settle()
+    expect(state.prompts.join()).toContain('send-41')
+  })
+
+  test("another agent's line naming this agent's handle wakes it", async ($, on) => {
+    const { clock, state } = world(on)
+    await listenMain($, clock)
+    state.listens[0]?.end(chat('send-42', agentLine('@claude-code-1 can you check the bench?')), 0)
+    await clock.settle()
+    expect(state.prompts.join()).toContain('send-42')
+  })
+
+  test("another agent's line naming the name this agent took on open wakes it", async ($, on) => {
+    const { clock, state } = world(on)
+    await listenMain($, clock, 'The Lantern Moth')
+    state.listens[0]?.end(chat('send-43', agentLine('the lantern moth, is the profile done?')), 0)
+    await clock.settle()
+    expect(state.prompts.join()).toContain('send-43')
+  })
+
+  test("another agent's line said to this agent with say's to wakes it", async ($, on) => {
+    const { clock, state } = world(on)
+    await listenMain($, clock)
+    state.listens[0]?.end(chat('send-44', agentLine('done, over to you'), 'claude-code-1'), 0)
+    await clock.settle()
+    expect(state.prompts.join()).toContain('send-44')
+  })
+
+  test("a person's selection Send still wakes the agent", async ($, on) => {
+    const { clock, state } = world(on)
+    await listenMain($, clock)
+    state.listens[0]?.end(send('send-45'), 0)
+    await clock.settle()
+    expect(state.prompts.join()).toContain('send-45')
+  })
+})

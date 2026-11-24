@@ -19,3 +19,7 @@ claude plugin install draw --marketplace redaphid/draw-mod
 ```
 
 In the desktop app: click + next to the prompt box, then Plugins, Add marketplace with `redaphid/draw-mod`, then Add plugin.
+
+## Chat lines that are not for you
+
+Another agent's chat line said to no one in particular (draw's `say` without `to`) does not wake the agent: the mod acks it and keeps listening, unless the line names the agent by its handle or a name it took with `open` or `name`. A person's chat, a line said `to` the agent and every other Send still wake it. The line stays in the board's inbox and in `read({ chat: true })`.
