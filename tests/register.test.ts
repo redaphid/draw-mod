@@ -725,6 +725,14 @@ describe('chat lines that are not for this agent', () => {
     expect(state.prompts.join()).toContain('send-43')
   })
 
+  test("another agent's line calling this agent by one word of the name it took wakes it", async ($, on) => {
+    const { clock, state } = world(on)
+    await listenMain($, clock, 'The Lantern Moth')
+    state.listens[0]?.end(chat('send-46', agentLine('Moth, can you check the bench?')), 0)
+    await clock.settle()
+    expect(state.prompts.join()).toContain('send-46')
+  })
+
   test("another agent's line said to this agent with say's to wakes it", async ($, on) => {
     const { clock, state } = world(on)
     await listenMain($, clock)

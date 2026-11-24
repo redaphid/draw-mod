@@ -28,6 +28,7 @@ import {
   laneKey,
   handleOf,
   listenArgv,
+  nameForms,
   unaddressed,
   parseSend,
   parseTicket,
@@ -218,11 +219,14 @@ async function arm($: EngineInterface, key: string) {
   }
 }
 
-// What other agents' chat lines may call this listener's agent: its handle on the board and the names it took there.
-const namesOf = (listener: Listener, ticket: Ticket) =>
-  [handleOf(ticket.watcher), handleOf(listener.lane ? laneClaims(listener.lane)?.agent : undefined), ...(listener.names ?? [])].filter(
-    (name): name is string => Boolean(name),
-  )
+// What other agents' chat lines may call this listener's agent: its handle on the board, and every form of each name
+// it took there (`nameForms`), so a line that calls it even by one word of its name wakes it.
+const namesOf = (listener: Listener, ticket: Ticket) => [
+  ...[handleOf(ticket.watcher), handleOf(listener.lane ? laneClaims(listener.lane)?.agent : undefined)].filter(
+    (handle): handle is string => Boolean(handle),
+  ),
+  ...(listener.names ?? []).flatMap(nameForms),
+]
 
 // One listener per lane agent, whatever handle names it: a fresh handle and owner replace the old ones.
 async function track($: EngineInterface, lane: string, owner: string) {

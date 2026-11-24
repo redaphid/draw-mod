@@ -297,16 +297,27 @@ export const handleOf = (watcher: string | undefined) => {
   return watcher && slash >= 0 ? watcher.slice(slash + 1) || undefined : undefined
 }
 
-// A name and, when it starts with an article ("The Lantern Moth"), the name without it, as agents often write it.
-const withoutArticle = (name: string) => {
-  const bare = name.trim().replace(/^(the|a|an)\s+/i, '')
-  return bare === name.trim() ? [name] : [name, bare]
+// Common words that never count as an agent's name on their own, even inside a display name ("Talk Board Agent").
+const STOPWORDS = new Set([
+  'the', 'board', 'talk', 'frame', 'agent', 'lane', 'review', 'check', 'test', 'done',
+  'this', 'that', 'with', 'from', 'have', 'here', 'there', 'what', 'when', 'will', 'your', 'just', 'chat', 'send', 'note',
+])
+
+// Every form of a display name that calls its agent, so a line addressed to it is never dropped (Aaron, draw#689:
+// "must never drop a line addressed to an agent by name"): the name, the name without a leading "The", "A" or "An",
+// and each word of it with at least four letters that is not a common word ("Finch" for "Bravo Finch").
+export const nameForms = (name: string) => {
+  const full = name.trim()
+  if (!full) return []
+  const bare = full.replace(/^(the|a|an)\s+/i, '')
+  const words = full.split(/[^\p{L}\p{N}]+/u).filter(w => [...w].length >= 4 && !STOPWORDS.has(w.toLowerCase()))
+  return [...new Set([full, bare, ...words])]
 }
 
-// Whether `text` names any of `names` as a whole word, with an optional `@`, ignoring case.
-export const mentions = (text: string, names: readonly string[]) =>
-  names.flatMap(withoutArticle).some(name => {
-    const literal = name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+// Whether `text` holds any of `forms` as a whole word, with an optional `@`, ignoring case.
+export const mentions = (text: string, forms: readonly string[]) =>
+  forms.some(form => {
+    const literal = form.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     return literal !== '' && new RegExp(`(?<![\\p{L}\\p{N}-])@?${literal}(?![\\p{L}\\p{N}-])`, 'iu').test(text)
   })
 

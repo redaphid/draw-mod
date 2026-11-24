@@ -23,6 +23,7 @@ import {
   toolPrefix,
   upgrade,
   unaddressed,
+  nameForms,
 } from '../hooks/lib'
 
 const LANE =
@@ -285,15 +286,27 @@ describe('unaddressed chat', () => {
     `chat on frame talk "talk" from Stopwatch Heron:\n${text}\n\nAn agent said this. Answer with say({ text, frame: "talk" }) only if it asks you something; your answer wakes it.`
 
   test("another agent's status line naming no one is unaddressed", () => {
-    expect(unaddressed({ sent: 'send-1', scope: 'chat', note: line('first frame 23% faster') }, ['wake-fix', 'Quiet Bell'])).toBe(true)
+    expect(unaddressed({ sent: 'send-1', scope: 'chat', note: line('first frame 23% faster') }, ['wake-fix', ...nameForms('Quiet Bell')])).toBe(true)
   })
 
   test('a line naming the agent by display name is for it', () => {
-    expect(unaddressed({ sent: 'send-2', scope: 'chat', note: line('Quiet Bell, look at this') }, ['Quiet Bell'])).toBe(false)
+    expect(unaddressed({ sent: 'send-2', scope: 'chat', note: line('Quiet Bell, look at this') }, nameForms('Quiet Bell'))).toBe(false)
   })
 
   test('a line naming the agent without the article its name starts with is for it', () => {
-    expect(unaddressed({ sent: 'send-7', scope: 'chat', note: line('Lantern Moth: PR 232 is open') }, ['The Lantern Moth'])).toBe(false)
+    expect(unaddressed({ sent: 'send-7', scope: 'chat', note: line('Lantern Moth: PR 232 is open') }, nameForms('The Lantern Moth'))).toBe(false)
+  })
+
+  test('a line calling the agent by one word of its name is for it', () => {
+    expect(unaddressed({ sent: 'send-10', scope: 'chat', note: line('Moth, can you check the bench?') }, nameForms('The Lantern Moth'))).toBe(false)
+  })
+
+  test('a line that is only a short name and a question mark is for it', () => {
+    expect(unaddressed({ sent: 'send-11', scope: 'chat', note: line('Finch?') }, nameForms('Bravo Finch'))).toBe(false)
+  })
+
+  test('a common word of the name alone does not call it', () => {
+    expect(unaddressed({ sent: 'send-12', scope: 'chat', note: line('review done, board is green') }, nameForms('Review Board'))).toBe(true)
   })
 
   test('a name inside a longer handle does not count', () => {
@@ -301,7 +314,7 @@ describe('unaddressed chat', () => {
   })
 
   test("the speaker's own name in the header does not count", () => {
-    expect(unaddressed({ sent: 'send-4', scope: 'chat', note: line('done') }, ['Stopwatch Heron'])).toBe(true)
+    expect(unaddressed({ sent: 'send-4', scope: 'chat', note: line('done') }, nameForms('Stopwatch Heron'))).toBe(true)
   })
 
   test("a person's chat message is never unaddressed", () => {
