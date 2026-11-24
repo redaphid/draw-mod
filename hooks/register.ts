@@ -26,7 +26,10 @@ import {
   laneHandles,
   openedBoard,
   laneKey,
+  handleOf,
   listenArgv,
+  nameForms,
+  unaddressed,
   parseSend,
   parseTicket,
   retryPlan,
@@ -189,6 +192,14 @@ async function arm($: EngineInterface, key: string) {
     const send = code === 0 ? parseSend(stdout) : undefined
     if (!send) return await retry($, key, stderr.trim().split('\n').pop() || `listener exited ${code}`)
     failures.delete(key)
+    if (unaddressed(send, namesOf(current, ticket))) {
+      // Acked by the next listen, which starts now: no turn of this agent's will end to start it.
+      log($, `${send.sent}: another agent's chat line to no one in particular, acked without waking the agent`)
+      if (stale()) return
+      await update($, listeners, list => afterDelivery(list, key, send, current.owner))
+      await refresh($)
+      return void arm($, key)
+    }
     let threw = false
     const owner = await deliver($, current, send).catch(error => {
       threw = true
@@ -207,6 +218,15 @@ async function arm($: EngineInterface, key: string) {
     await retry($, key, error instanceof Error ? error.message : String(error))
   }
 }
+
+// What other agents' chat lines may call this listener's agent: its handle on the board, and every form of each name
+// it took there (`nameForms`), so a line that calls it even by one word of its name wakes it.
+const namesOf = (listener: Listener, ticket: Ticket) => [
+  ...[handleOf(ticket.watcher), handleOf(listener.lane ? laneClaims(listener.lane)?.agent : undefined)].filter(
+    (handle): handle is string => Boolean(handle),
+  ),
+  ...(listener.names ?? []).flatMap(nameForms),
+]
 
 // One listener per lane agent, whatever handle names it: a fresh handle and owner replace the old ones.
 async function track($: EngineInterface, lane: string, owner: string) {
@@ -230,10 +250,11 @@ async function track($: EngineInterface, lane: string, owner: string) {
 async function learn($: EngineInterface, agentId: string | undefined, lane: string | undefined, sat: { board?: string } | undefined) {
   if (agentId && lane) return track($, lane, agentId)
   if (agentId || !sat) return
+  const names = (await find($, MAIN))?.names
   stop(MAIN)
   failures.delete(MAIN)
   retrying.delete(MAIN)
-  await save($, { key: MAIN, ...sat, status: 'waiting' })
+  await save($, { key: MAIN, ...sat, status: 'waiting', ...(names ? { names } : {}) })
 }
 
 const log = ($: EngineInterface, error: unknown) =>
@@ -377,6 +398,11 @@ export const register: Register = on => {
     const opened = tool === 'open' ? openedBoard(ran.text ?? '') : undefined
     const sat = tool === 'open' ? (opened ? { board: opened } : {}) : named && named !== mainBoard ? { board: named } : undefined
     await learn($, agentId, scoped ? undefined : given, sat).catch(error => log($, error))
+    const took = (tool === 'name' || tool === 'open') && 'name' in e && typeof e.name === 'string' ? e.name : undefined
+    if (took)
+      await update($, listeners, list => list.map(l => (l.key === key ? { ...l, names: [...new Set([...(l.names ?? []), took])] } : l))).catch(
+        error => log($, error),
+      )
     return ran
   }).catch(($, e, next) =>
     // A failed guard must not let a subagent's call through unscoped, so it refuses in the guard's place.

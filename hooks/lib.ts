@@ -15,6 +15,8 @@ export type Ticket = {
   origin: string
   board: string
   principal?: string
+  // The watcher the ticket listens as, `<principal>/<agent>`: its agent part is a handle other agents may name it by.
+  watcher?: string
   ticket: string
 }
 
@@ -82,7 +84,9 @@ export function parseTicket(text: string, home: string): Ticket | undefined {
   const board = flag(run, 'board')
   const ticket = flag(run, 'ticket')
   if (!board || !ticket) return undefined
-  const principal = payloadOf(ticket)?.p
+  const claims = payloadOf(ticket)
+  const principal = claims?.p
+  const watcher = claims?.w
   return {
     script,
     sha256,
@@ -90,6 +94,7 @@ export function parseTicket(text: string, home: string): Ticket | undefined {
     origin: new URL(script).origin,
     board,
     ...(typeof principal === 'string' ? { principal } : {}),
+    ...(typeof watcher === 'string' ? { watcher } : {}),
     ticket,
   }
 }
@@ -285,3 +290,51 @@ export const SCOPE_TTL_MS = 24 * 60 * 60 * 1000
 // forgotten only once its agent has made no tool call for a day.
 export const idle = (agentIds: string[], lastCall: ReadonlyMap<string, number>, now: number) =>
   agentIds.filter(id => now - (lastCall.get(id) ?? now) >= SCOPE_TTL_MS)
+
+// An agent's own handle, the part of its watcher id after the last slash; a principal alone has none.
+export const handleOf = (watcher: string | undefined) => {
+  const slash = watcher?.lastIndexOf('/') ?? -1
+  return watcher && slash >= 0 ? watcher.slice(slash + 1) || undefined : undefined
+}
+
+// Common words that never count as an agent's name on their own, even inside a display name ("Talk Board Agent").
+const STOPWORDS = new Set([
+  'the', 'board', 'talk', 'frame', 'agent', 'lane', 'review', 'check', 'test', 'done',
+  'this', 'that', 'with', 'from', 'have', 'here', 'there', 'what', 'when', 'will', 'your', 'just', 'chat', 'send', 'note',
+])
+
+// Every form of a display name that calls its agent, so a line addressed to it is never dropped (Aaron, draw#689:
+// "must never drop a line addressed to an agent by name"): the name, the name without a leading "The", "A" or "An",
+// and each word of it with at least four letters that is not a common word ("Finch" for "Bravo Finch").
+export const nameForms = (name: string) => {
+  const full = name.trim()
+  if (!full) return []
+  const bare = full.replace(/^(the|a|an)\s+/i, '')
+  const words = full.split(/[^\p{L}\p{N}]+/u).filter(w => [...w].length >= 4 && !STOPWORDS.has(w.toLowerCase()))
+  return [...new Set([full, bare, ...words])]
+}
+
+// Whether `text` holds any of `forms` as a whole word, with an optional `@`, ignoring case.
+export const mentions = (text: string, forms: readonly string[]) =>
+  forms.some(form => {
+    const literal = form.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return literal !== '' && new RegExp(`(?<![\\p{L}\\p{N}-])@?${literal}(?![\\p{L}\\p{N}-])`, 'iu').test(text)
+  })
+
+// A board from before 2026-11-24 wraps an agent's chat line as a header, the line, a blank line and an instruction
+// that starts and ends with these. A board from after it words that instruction differently, since it already wakes
+// only the agents a line names (redaphid/draw#866), and its names (a display name the agent took in an earlier session)
+// can be more than the mod knows, so the mod leaves its lines alone rather than drop one the board meant to wake.
+const AGENT_CHAT = 'An agent said this.'
+const WAKES_EVERYONE = 'your answer wakes it.'
+
+// Another agent's chat line said to everyone and naming none of `names`, from a board that wakes every listening agent
+// with one: a status line, not a question for this agent. Each wake costs a whole model turn to read and dismiss, so
+// the mod acks it without waking anyone. It stays in the frame's chat. Any note the mod does not recognise wakes.
+export function unaddressed(send: Send, names: readonly string[]) {
+  if (send.scope !== 'chat' || send.to) return false
+  const lines = (send.note ?? '').trimEnd().split('\n')
+  const last = lines.at(-1) ?? ''
+  if (!last.startsWith(AGENT_CHAT) || !last.endsWith(WAKES_EVERYONE)) return false
+  return !mentions(lines.slice(1, -2).join('\n'), names)
+}
